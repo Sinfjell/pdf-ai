@@ -80,14 +80,10 @@ def audio_to_text(audio_file):
 def main():
     load_dotenv()
     st.set_page_config(page_title='Chat with PDF', page_icon=':books:')
-
     st.write(css, unsafe_allow_html=True)
 
-    if "conversation" not in st.session_state:
-        st.session_state.conversation = None
-
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = None
+    st.session_state.conversation = st.session_state.get('conversation', None)
+    st.session_state.chat_history = st.session_state.get('chat_history', None)
 
     st.header('Chat with PDF :books:')
     user_question = st.text_input('Ask a Question about your documents')
@@ -97,52 +93,28 @@ def main():
     with st.sidebar:
         st.subheader('Your Documents')
         pdf_docs = st.file_uploader('Upload PDFs', accept_multiple_files=True)
-
         audio_file = st.file_uploader("Upload an audio file", type=['wav'])
-        
-        if audio_file is not None:
-            # convert audio to text
-            raw_text = audio_to_text(audio_file)
-
-            # get text chunks 
-            text_chunks = get_text_chunks(raw_text)
-
-            # create vector store
-            vectorstore = get_vectorstore(text_chunks)
-
-            # create conversation chain
-            st.session_state.conversation = get_conversation_chain(vectorstore)
-
 
         if st.button('Process'):
             with st.spinner('Processing'):
-                # get the pdf text
-                raw_text = get_pdf_text(pdf_docs)
+                text_chunks = []
 
-                # get text chunks 
-                text_chunks = get_text_chunks(raw_text)
+                if pdf_docs:
+                    # get the pdf text
+                    raw_text = get_pdf_text(pdf_docs)
+                    # get text chunks 
+                    text_chunks.extend(get_text_chunks(raw_text))
 
-                # process audio if available
                 if audio_file is not None:
                     # convert audio to text
                     audio_text = audio_to_text(audio_file)
-
                     # append audio text to existing text chunks
-                    text_chunks.append(audio_text)
+                    text_chunks.extend(get_text_chunks(audio_text))
 
                 # create vector store
                 vectorstore = get_vectorstore(text_chunks)
-
                 # create conversation chain
                 st.session_state.conversation = get_conversation_chain(vectorstore)
-
-                # create vector store
-                vectorstore = get_vectorstore(text_chunks)
-
-                # create conversation chain
-                st.session_state.conversation = get_conversation_chain(vectorstore)
-        
-    
 
 if __name__ == '__main__':
     main()
