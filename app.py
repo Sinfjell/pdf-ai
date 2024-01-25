@@ -64,15 +64,16 @@ def handle_userinput(user_question):
 
 
 def audio_to_text(audio_file):
-    # convert mp3 file to wav
-    audio = AudioSegment.from_mp3(audio_file)
+    audio = AudioSegment.from_wav(audio_file, parameters=["-analyzeduration", "2147480000", "-probesize", "2147480000"])
+    # rest of your code
     audio.export("temp.wav", format="wav")
+    
 
     # transcribe audio file
     recognizer = sr.Recognizer()
     with sr.AudioFile('temp.wav') as source:
         audio_data = recognizer.record(source)
-        text = recognizer.recognize_google(audio_data)
+        text = recognizer.recognize_google(audio_data, language='no-NO')
     
     return text
 
@@ -97,7 +98,7 @@ def main():
         st.subheader('Your Documents')
         pdf_docs = st.file_uploader('Upload PDFs', accept_multiple_files=True)
 
-        audio_file = st.file_uploader("Upload an audio file", type=['mp3'])
+        audio_file = st.file_uploader("Upload an audio file", type=['wav'])
         
         if audio_file is not None:
             # convert audio to text
@@ -120,6 +121,20 @@ def main():
 
                 # get text chunks 
                 text_chunks = get_text_chunks(raw_text)
+
+                # process audio if available
+                if audio_file is not None:
+                    # convert audio to text
+                    audio_text = audio_to_text(audio_file)
+
+                    # append audio text to existing text chunks
+                    text_chunks.append(audio_text)
+
+                # create vector store
+                vectorstore = get_vectorstore(text_chunks)
+
+                # create conversation chain
+                st.session_state.conversation = get_conversation_chain(vectorstore)
 
                 # create vector store
                 vectorstore = get_vectorstore(text_chunks)
