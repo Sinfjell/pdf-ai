@@ -93,7 +93,7 @@ def main():
     with st.sidebar:
         st.subheader('Your Documents')
         pdf_docs = st.file_uploader('Upload PDFs', accept_multiple_files=True)
-        audio_file = st.file_uploader("Upload an audio file", type=['wav'])
+        audio_files = st.file_uploader("Upload audio files", type=['wav'], accept_multiple_files=True)
 
         if st.button('Process'):
             with st.spinner('Processing'):
@@ -105,11 +105,12 @@ def main():
                     # get text chunks 
                     text_chunks.extend(get_text_chunks(raw_text))
 
-                if audio_file is not None:
-                    # convert audio to text
-                    audio_text = audio_to_text(audio_file)
-                    # append audio text to existing text chunks
-                    text_chunks.extend(get_text_chunks(audio_text))
+                if audio_files is not None:
+                    for audio_file in audio_files:
+                        # convert audio to text
+                        raw_text = audio_to_text(audio_file)
+                        # get text chunks 
+                        text_chunks.extend(get_text_chunks(raw_text))
 
                 # create vector store
                 vectorstore = get_vectorstore(text_chunks)
