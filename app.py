@@ -12,6 +12,28 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from htmlTemplates import css, bot_template, user_template
 
+
+import cv2
+import pytesseract
+
+import tempfile
+
+def image_to_text(image_file):
+    # Create a temporary file
+    tfile = tempfile.NamedTemporaryFile(delete=False) 
+    tfile.write(image_file.read())
+
+    # Read the image file
+    img = cv2.imread(tfile.name)
+
+    # Convert the image to gray scale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Use Tesseract to extract text
+    text = pytesseract.image_to_string(gray)
+
+    return text
+
 def get_pdf_text(pdf_docs):
     text = ""
     for pdf in pdf_docs:
@@ -94,7 +116,7 @@ def main():
         st.subheader('Your Documents')
         pdf_docs = st.file_uploader('Upload PDFs', accept_multiple_files=True)
         audio_files = st.file_uploader("Upload audio files", type=['wav'], accept_multiple_files=True)
-
+        image_files = st.file_uploader("Upload image files", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
         if st.button('Process'):
             with st.spinner('Processing'):
                 text_chunks = []
@@ -110,6 +132,14 @@ def main():
                         # convert audio to text
                         raw_text = audio_to_text(audio_file)
                         # get text chunks 
+                        text_chunks.extend(get_text_chunks(raw_text))
+
+                
+                if image_files is not None:
+                    for image_file in image_files:
+                        # convert image to text
+                        raw_text = image_to_text(image_file)
+                        # get text chunks
                         text_chunks.extend(get_text_chunks(raw_text))
 
                 # create vector store
