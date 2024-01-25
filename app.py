@@ -1,4 +1,6 @@
 import streamlit as st
+import speech_recognition as sr
+from pydub import AudioSegment
 from dotenv import load_dotenv
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
@@ -30,7 +32,13 @@ def get_text_chunks(raw_text):
 
 def get_vectorstore(chunks):
     embeddings = OpenAIEmbeddings()
-    vectorStore = FAISS.from_texts(chunks, embedding=embeddings)
+    vectorStore = None  # default value
+    
+    if not chunks or all(not chunk for chunk in chunks):
+        st.error("No valid text chunks found in the audio file.")
+    else:
+        vectorStore = FAISS.from_texts(chunks, embedding=embeddings)
+    
     return vectorStore
 
 def get_conversation_chain(vectorstore):
@@ -55,6 +63,19 @@ def handle_userinput(user_question):
             
 
 
+def audio_to_text(audio_file):
+    # convert mp3 file to wav
+    audio = AudioSegment.from_mp3(audio_file)
+    audio.export("temp.wav", format="wav")
+
+    # transcribe audio file
+    recognizer = sr.Recognizer()
+    with sr.AudioFile('temp.wav') as source:
+        audio_data = recognizer.record(source)
+        text = recognizer.recognize_google(audio_data)
+    
+    return text
+
 def main():
     load_dotenv()
     st.set_page_config(page_title='Chat with PDF', page_icon=':books:')
@@ -75,6 +96,23 @@ def main():
     with st.sidebar:
         st.subheader('Your Documents')
         pdf_docs = st.file_uploader('Upload PDFs', accept_multiple_files=True)
+
+        audio_file = st.file_uploader("Upload an audio file", type=['mp3'])
+        
+        if audio_file is not None:
+            # convert audio to text
+            raw_text = audio_to_text(audio_file)
+
+            # get text chunks 
+            text_chunks = get_text_chunks(raw_text)
+
+            # create vector store
+            vectorstore = get_vectorstore(text_chunks)
+
+            # create conversation chain
+            st.session_state.conversation = get_conversation_chain(vectorstore)
+
+
         if st.button('Process'):
             with st.spinner('Processing'):
                 # get the pdf text
@@ -88,8 +126,8 @@ def main():
 
                 # create conversation chain
                 st.session_state.conversation = get_conversation_chain(vectorstore)
-
-
+        
+    
 
 if __name__ == '__main__':
     main()
