@@ -1,2 +1,9 @@
 opencv-python==4.5.3.56
 pytesseract==0.3.8
+pydub==0.25.1
+python-dotenv==0.19.1
+PyPDF2==1.26.0
+opencv-python==4.6.0.66
+pytesseract==0.3.8
+moviepy==1.0.3
+speech_recognition==3.8.1

@@ -11,20 +11,83 @@ from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from htmlTemplates import css, bot_template, user_template
-
-
 import cv2
 import pytesseract
-
 import tempfile
+from moviepy.editor import VideoFileClip
+from pydub import AudioSegment
+import speech_recognition as sr
 
-def image_to_text(image_file):
+def audio_to_text(audio_file):
+    audio = AudioSegment.from_wav(audio_file, parameters=["-analyzeduration", "2147480000", "-probesize", "2147480000"])
+    # rest of your code
+    audio.export("temp.wav", format="wav")
+    
+
+    # transcribe audio file
+    recognizer = sr.Recognizer()
+    with sr.AudioFile('temp.wav') as source:
+        audio_data = recognizer.record(source)
+        text = recognizer.recognize_google(audio_data, language='no-NO')
+    
+    return text
+
+def video_to_audio(video_file):
+    video = VideoFileClip(video_file)
+    audio = video.audio
+    audio_file = "temp_audio.wav"
+    audio.write_audiofile(audio_file)
+    return audio_file
+
+
+def video_to_text(video_file, frame_interval=10):
     # Create a temporary file
-    tfile = tempfile.NamedTemporaryFile(delete=False) 
-    tfile.write(image_file.read())
+    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") 
+    tfile.write(video_file.read())
+    tfile.close()
 
-    # Read the image file
-    img = cv2.imread(tfile.name)
+    # Extract audio from video and convert to text
+    video = VideoFileClip(tfile.name)
+    audio_file = "temp_audio.wav"
+    video.audio.write_audiofile(audio_file)
+    audio_text = audio_to_text(audio_file)
+
+    # Create a VideoCapture object
+    cap = cv2.VideoCapture(tfile.name)
+
+    text = ""
+    frame_count = 0
+
+    # Loop over each frame in the video
+    while cap.isOpened():
+        # Read the next frame
+        ret, frame = cap.read()
+
+        # If the frame was read correctly, process it
+        if ret:
+            # Only process every nth frame
+            if frame_count % frame_interval == 0:
+                # Convert the frame to text
+                frame_text = image_to_text(frame)
+                text += frame_text
+
+            frame_count += 1
+        else:
+            # If no frame could be read, break the loop
+            break
+
+    # Release the VideoCapture object
+    cap.release()
+
+    # Combine the text from the video frames and the audio
+    text += "\n" + audio_text
+
+    return text
+def image_to_text(img):
+    # Check if the image was correctly read
+    if img is None:
+        print(f"Could not read image")
+        return ""
 
     # Convert the image to gray scale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -85,19 +148,6 @@ def handle_userinput(user_question):
             
 
 
-def audio_to_text(audio_file):
-    audio = AudioSegment.from_wav(audio_file, parameters=["-analyzeduration", "2147480000", "-probesize", "2147480000"])
-    # rest of your code
-    audio.export("temp.wav", format="wav")
-    
-
-    # transcribe audio file
-    recognizer = sr.Recognizer()
-    with sr.AudioFile('temp.wav') as source:
-        audio_data = recognizer.record(source)
-        text = recognizer.recognize_google(audio_data, language='no-NO')
-    
-    return text
 
 def main():
     load_dotenv()
@@ -117,6 +167,7 @@ def main():
         pdf_docs = st.file_uploader('Upload PDFs', accept_multiple_files=True)
         audio_files = st.file_uploader("Upload audio files", type=['wav'], accept_multiple_files=True)
         image_files = st.file_uploader("Upload image files", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+        video_files = st.file_uploader("Upload video files", type=['mp4', 'mov'], accept_multiple_files=True)
         if st.button('Process'):
             with st.spinner('Processing'):
                 text_chunks = []
@@ -140,6 +191,11 @@ def main():
                         # convert image to text
                         raw_text = image_to_text(image_file)
                         # get text chunks
+                        text_chunks.extend(get_text_chunks(raw_text))
+
+                if video_files is not None:
+                    for video_file in video_files:
+                        raw_text = video_to_text(video_file)
                         text_chunks.extend(get_text_chunks(raw_text))
 
                 # create vector store
